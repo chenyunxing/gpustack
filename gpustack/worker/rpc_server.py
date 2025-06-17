@@ -54,7 +54,7 @@ class RPCServer:
         args: Optional[List[str]] = None,
     ):
         command_path = pkg_resources.files(
-            "gpustack.third_party.bin.llama-box"
+            "gpustack.third_party.bin.llama-box.llama-box-default"
         ).joinpath(RPCServer.get_llama_box_rpc_server_command())
 
         arguments = [

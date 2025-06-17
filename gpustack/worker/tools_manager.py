@@ -152,7 +152,10 @@ class ToolsManager:
         shutil.unpack_archive(archive_path, self.third_party_bin_path)
 
         # Ensure the rpc server is linked correctly
-        self._link_llama_box_rpc_server()
+        target_dir = self.third_party_bin_path / "llama-box" / "llama-box-default"
+        target_file = Path(get_llama_box_command(target_dir))
+        file_name = os.path.basename(target_file)
+        self._link_llama_box_rpc_server(target_dir, file_name)
 
     def prepare_versioned_backend(self, backend: str, version: str):
         if backend == BackendEnum.LLAMA_BOX:
@@ -170,7 +173,11 @@ class ToolsManager:
 
     def download_llama_box(self):
         version = BUILTIN_LLAMA_BOX_VERSION
-        target_dir = self.third_party_bin_path / "llama-box"
+        target_dir = (
+            self.third_party_bin_path
+            / "llama-box"
+            / get_llama_box_version_dir_name(version)
+        )
         target_file = Path(get_llama_box_command(target_dir))
         file_name = os.path.basename(target_file)
 
@@ -185,6 +192,7 @@ class ToolsManager:
             self._update_versions_file(file_name, version)
 
         self._link_llama_box_rpc_server(target_dir, file_name)
+        self._link_llama_box_to_llama_box_base_dir(version)
 
     def install_versioned_ascend_mindie(self, version: str):
         if self._os != "linux":
@@ -232,12 +240,15 @@ class ToolsManager:
         self._download_acsend_mindie(version, target_dir)
 
     def install_versioned_llama_box(self, version: str):
-        target_dir = Path(self._bin_dir)
-        file_name = get_versioned_command(
-            "llama-box.exe" if self._os == "windows" else "llama-box", version
-        )
 
-        target_file = target_dir / file_name
+        target_dir = (
+            self.third_party_bin_path
+            / "llama-box"
+            / get_llama_box_version_dir_name(version)
+        )
+        target_file = Path(get_llama_box_command(target_dir))
+        file_name = os.path.basename(target_file)
+
         if target_file.is_file():
             logger.debug(f"{file_name} already exists, skipping download")
             return
@@ -453,8 +464,9 @@ class ToolsManager:
 
         file_name = "llama-box.exe" if self._os == "windows" else "llama-box"
         target_file = target_dir / target_file_name
+        shutil.copytree(llama_box_tmp_dir, target_dir, dirs_exist_ok=True)
         shutil.copy(llama_box_tmp_dir / file_name, target_file)
-
+        os.remove(target_dir / f"llama-box-{version}-{platform_name}.zip")
         # Make the file executable (non-Windows only)
         if self._os != "windows":
             st = os.stat(target_file)
@@ -494,6 +506,35 @@ class ToolsManager:
             os.symlink(src_file_name, dst_file_name, dir_fd=target_dir_fd)
 
         logger.debug(f"Linked llama-box-rpc-server to {dst_file}")
+
+    def _link_llama_box_to_llama_box_base_dir(self, version: str):
+        """
+        Create a directory relative symlink 'llama-box-default' in bin directory.
+        This enables seamless version switching between multiple llama-box installations.
+        """
+        base_dir = self.third_party_bin_path / "llama-box"
+        src_fold_name = get_llama_box_version_dir_name(version)
+        dst_fold_name = "llama-box-default"
+        src_dir = base_dir / src_fold_name
+        dst_dir = base_dir / dst_fold_name
+
+        if os.path.islink(dst_dir):
+            current_target = os.readlink(dst_dir)
+            if current_target == src_fold_name:
+                logger.debug(
+                    f"{dst_fold_name} already linked to {src_fold_name} in {base_dir}, skipping"
+                )
+                return
+            else:
+                os.remove(dst_dir)
+
+        target_dir_fd = os.open(base_dir, os.O_RDONLY)
+        if self._os == "windows":
+            os.link(src_dir, dst_dir)
+        else:
+            target_dir_fd = os.open(base_dir, os.O_RDONLY)
+            os.symlink(src_fold_name, dst_fold_name, dir_fd=target_dir_fd)
+        logger.debug(f"Linked from {src_dir} to {dst_dir}")
 
     def _get_llama_box_platform_name(self, version: str) -> str:  # noqa C901
         """
@@ -897,3 +938,14 @@ def get_llama_box_command(
     if not os.path.exists(full_path) and not os.path.exists(default_path):
         return full_path
     return full_path if os.path.exists(full_path) else default_path
+
+
+def get_llama_box_version_dir_name(
+    version: str,
+) -> str:
+    system = platform.system()
+    arch = platform.arch()
+    device = platform.device()
+    device = f'-{device}' if device != '' else ''
+    dir_name = os.path.join(f"llama-box-{version}-{system}-{arch}{device}")
+    return dir_name

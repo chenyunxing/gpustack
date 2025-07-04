@@ -174,6 +174,8 @@ class WorkerBase(SQLModel):
     worker_uuid: str
 
     def compute_state(self, worker_offline_timeout=60):
+        if self.state == WorkerStateEnum.NOT_READY:
+            return
         now = int(datetime.now(timezone.utc).timestamp())
         heartbeat_timestamp = (
             self.heartbeat_time.timestamp() if self.heartbeat_time else None

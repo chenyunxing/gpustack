@@ -88,7 +88,7 @@ class WorkerManager:
         worker.name = current.name
         worker.id = current.id
         worker.labels = current.labels
-        worker.state = current.state
+        # worker.state = current.state
         worker.unreachable = current.unreachable
         worker.system_reserved = self._system_reserved
         worker.heartbeat_time = now

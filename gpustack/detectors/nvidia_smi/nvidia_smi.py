@@ -13,6 +13,10 @@ from gpustack.utils.command import is_command_available
 from gpustack.utils.convert import safe_float, safe_int
 
 
+class NvidiaSMIInitException(Exception):
+    pass
+
+
 class NvidiaSMI(GPUDetector):
     def is_available(self) -> bool:
         return is_command_available("nvidia-smi")
@@ -90,6 +94,11 @@ class NvidiaSMI(GPUDetector):
             output = result.stdout
             if "no devices" in output.lower():
                 return None
+
+            if "Failed to initialize NVML: Unknown Error" in result.stdout():
+                raise NvidiaSMIInitException(
+                    "Failed to initialize NVML: Unknown Error."
+                )
 
             if result.returncode != 0:
                 raise Exception(f"Unexpected return code: {result.returncode}")

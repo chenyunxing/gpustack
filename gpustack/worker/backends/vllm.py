@@ -62,6 +62,18 @@ class VLLMServer(InferenceServer):
 
             if self._model.backend_parameters:
                 arguments.extend(self._model.backend_parameters)
+            env = os.environ.copy()
+
+            enable_lmcache = True
+            if enable_lmcache:
+                arguments.extend(
+                    [
+                        "--kv-transfer-config",
+                        '{"kv_connector":"LMCacheConnectorV1", "kv_role":"kv_both"}',
+                    ]
+                )
+                env["LMCACHE_CONFIG_FILE"] = "/cpu-offload.yaml"
+                env["LMCACHE_USE_EXPERIMENTAL"] = "True"
 
             built_in_arguments = [
                 "--host",
@@ -78,7 +90,7 @@ class VLLMServer(InferenceServer):
 
             logger.info(f"Starting vLLM server: {command_path}")
             logger.debug(f"Run vLLM with arguments: {' '.join(arguments)}")
-            env = os.environ.copy()
+
             self.set_vllm_distributed_env(env)
             env = self.get_inference_running_env(env)
             env_view = None

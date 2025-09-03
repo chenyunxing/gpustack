@@ -507,7 +507,7 @@ def run(args: argparse.Namespace):
 
         logger.info(f"GPUStack version: {__version__} ({__git_commit__})")
 
-        if cfg.enable_lmcache:
+        if not cfg.server_url and cfg.enable_lmcache:
             start_lmcache_lookup_server(cfg)
 
         if cfg.server_url:

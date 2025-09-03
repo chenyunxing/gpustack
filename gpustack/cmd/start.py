@@ -149,7 +149,19 @@ def setup_start_cmd(subparsers: argparse._SubParsersAction):
         "--lmcache-register-port",
         type=int,
         help="Port for LMCACHE register service. Used when LMCACHE is enabled. The default is 40200.",
-        default=get_gpustack_env("LMCACHE_REGISTER_SERVICE_PORT"),
+        default=get_gpustack_env("LMCACHE_REGISTER_PORT"),
+    )
+    group.add_argument(
+        "--lmcache-capacity-gib",
+        type=int,
+        help="Capacity of LMCACHE in GiB. Used when LMCACHE is enabled. The default is 5.",
+        default=get_gpustack_env("LMCACHE_CAPACITY_GIB"),
+    )
+    group.add_argument(
+        "--lmcache-chunk-size",
+        type=int,
+        help="Chunk size of LMCACHE. Used when LMCACHE is enabled. The default is 256.",
+        default=get_gpustack_env("LMCACHE_CHUNK_SIZE"),
     )
 
     group = parser_server.add_argument_group("Server settings")
@@ -517,8 +529,7 @@ def start_lmcache_lookup_server(cfg: Config):
     server = TcpFakeServer(server_address, server_type="redis")
     t = Thread(target=server.serve_forever, daemon=True)
     t.start()
-    cfg.lmcache_lookup_url = f"{host}:{port}"
-    logger.info(f"Started LMCACHE lookup server at {cfg.lmcache_lookup_url}")
+    logger.info(f"Started LMCACHE register server at {host}:{port}")
 
 
 def run_server(cfg: Config):
@@ -597,7 +608,9 @@ def set_common_options(args, config_data: dict):
         "ray_node_manager_port",
         "ray_object_manager_port",
         "enable_lmcache",
-        "lmcache_lookup_service_port",
+        "lmcache_register_port",
+        "lmcache_capacity_gib",
+        "lmcache_chunk_size",
     ]
 
     for option in options:

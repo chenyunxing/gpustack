@@ -102,7 +102,9 @@ class Config(BaseSettings):
     ray_metrics_export_port: int = 40103
     enable_lmcache: bool = False
     lmcache_register_port: int = 40200
-    lmcache_lookup_url: str = "0.0.0.0:40200"
+    lmcache_distributed_port: str = "40201-40250"
+    lmcache_capacity_gib: int = 5
+    lmcache_chunk_size: int = 256
 
     # Server options
     host: Optional[str] = "0.0.0.0"

@@ -113,7 +113,7 @@ class VLLMServer(InferenceServer):
                 distributed_port = network.get_free_port(
                     port_range=config.lmcache_distributed_port,
                 )
-                env["LMCACHE_CHUNK_SIZE"] = config.lmcache_chunk_size
+                env["LMCACHE_CHUNK_SIZE"] = str(config.lmcache_chunk_size)
                 env["LMCACHE_LOCAL_CPU"] = "True"
                 env["LMCACHE_MAX_LOCAL_CPU_SIZE"] = str(config.lmcache_capacity_gib)
                 env["LMCACHE_ENABLE_P2P"] = "true"

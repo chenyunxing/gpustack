@@ -100,6 +100,9 @@ class Config(BaseSettings):
     ray_dashboard_agent_grpc_port: int = 40101
     ray_dashboard_agent_listen_port: int = 52365
     ray_metrics_export_port: int = 40103
+    enable_lmcache: bool = False
+    lmcache_register_port: int = 40200
+    lmcache_lookup_url: str = "0.0.0.0:40200"
 
     # Server options
     host: Optional[str] = "0.0.0.0"

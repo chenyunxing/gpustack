@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 from typing import Dict, List, Optional
+from gpustack.utils import network
 from gpustack.schemas.models import ModelInstance, ModelInstanceStateEnum
 from gpustack.schemas.workers import VendorEnum
 from gpustack.utils.command import (
@@ -96,6 +97,52 @@ class VLLMServer(InferenceServer):
                     f"With environment variables(inconsistent input items mean unchangeable):{os.linesep}"
                     f"{os.linesep.join(f'{k}={v}' for k, v in sorted(env_view.items()))}"
                 )
+            from gpustack.config.config import get_global_config
+
+            logger.info("=====================")
+            logger.info(env)
+            logger.info(self._clientset)
+            logger.info(self._worker)
+            logger.info(self._clientset.workers)
+            # main_server_ip = env.get("SSH_CLIENT", "").split(" ")[0]
+
+            config = get_global_config()
+            if True or config.enable_lmcache:
+                # chunk_size: 256
+                # local_cpu: true
+                # max_local_cpu_size: 5
+                # env["LMCACHE_CONFIG_FILE"] = "xxxx"# 需要建立一个基础的配置文件
+                # 配置文件有点，环境变量无需每次都写入，缺点是，文件生成需要每次都弄一次，才能确定，并且proxy传递的时候，如何获得主的ip和端口？
+                # 配置文件的话，里面应该有什么数据？基础三件套，chunk_size, local_cpu, max_local_cpu_size，然后默认开启P2p，寻找地址和自身地址应该如何配置？
+                # 也写入配置文件？每次开启机子，都需要重新读取和覆盖会不会太繁琐
+
+                # 环境变量配置，比较灵活，但是用户需要修改大量数据时，需要改动多，并且排查BUG也困难
+                distributed_port = network.get_free_port(
+                    port_range="40201-40250",
+                    # unavailable_ports=unavailable_ports,
+                )
+                env["LMCACHE_CHUNK_SIZE"] = "256"
+                env["LMCACHE_LOCAL_CPU"] = "True"
+                env["LMCACHE_MAX_LOCAL_CPU_SIZE"] = "5.0"
+                env["LMCACHE_ENABLE_P2P"] = "true"
+                env["LMCACHE_DISTRIBUTED_URL"] = f"{self._worker.ip}:{distributed_port}"
+                env["LMCACHE_LOOKUP_URL"] = "192.168.50.227:40200"
+                # os.get("LMCACHE_LOOKUP_SERVER_ADDRESS")
+                # # P2P configuration
+                # enable_p2p: true
+                # lookup_url: "192.168.50.227:6379"
+                # distributed_url: "localhost:8200"
+
+                kv_transfer_config = env.get("LMCACHE_KV_TRANSFER_CONFIG")
+                if not kv_transfer_config:
+                    arguments.extend(
+                        [
+                            "--kv-transfer-config",
+                            '{"kv_connector":"LMCacheConnectorV1", "kv_role":"kv_both"}',
+                        ]
+                    )
+                else:
+                    arguments.extend(["--kv-transfer-config", kv_transfer_config])
             result = subprocess.run(
                 [command_path] + arguments,
                 stdout=sys.stdout,

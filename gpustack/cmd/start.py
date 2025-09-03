@@ -13,6 +13,7 @@ from gpustack import __version__, __git_commit__
 from gpustack.config.config import set_global_config
 from gpustack.logging import setup_logging
 from gpustack.utils.envs import get_gpustack_env, get_gpustack_env_bool
+from gpustack.utils.network import get_first_non_loopback_ip
 from gpustack.worker.worker import Worker
 from gpustack.config import Config
 from gpustack.server.server import Server
@@ -137,6 +138,18 @@ def setup_start_cmd(subparsers: argparse._SubParsersAction):
         type=int,
         help="Port for Ray metrics export. Used when Ray is enabled. The default is 40103.",
         default=get_gpustack_env("RAY_METRICS_EXPORT_PORT"),
+    )
+    group.add_argument(
+        "--enable-lmcache",
+        action=OptionalBoolAction,
+        help="Enable LMCACHE.",
+        default=get_gpustack_env_bool("ENABLE_LMCACHE"),
+    )
+    group.add_argument(
+        "--lmcache-register-port",
+        type=int,
+        help="Port for LMCACHE register service. Used when LMCACHE is enabled. The default is 40200.",
+        default=get_gpustack_env("LMCACHE_REGISTER_SERVICE_PORT"),
     )
 
     group = parser_server.add_argument_group("Server settings")
@@ -482,12 +495,30 @@ def run(args: argparse.Namespace):
 
         logger.info(f"GPUStack version: {__version__} ({__git_commit__})")
 
+        if cfg.enable_lmcache:
+            start_lmcache_lookup_server(cfg)
+
         if cfg.server_url:
             run_worker(cfg)
         else:
             run_server(cfg)
+
     except Exception as e:
         logger.fatal(e)
+
+
+def start_lmcache_lookup_server(cfg: Config):
+    from threading import Thread
+    from fakeredis import TcpFakeServer
+
+    host = get_first_non_loopback_ip()
+    port = cfg.lmcache_register_port
+    server_address = (host, port)
+    server = TcpFakeServer(server_address, server_type="redis")
+    t = Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    cfg.lmcache_lookup_url = f"{host}:{port}"
+    logger.info(f"Started LMCACHE lookup server at {cfg.lmcache_lookup_url}")
 
 
 def run_server(cfg: Config):
@@ -565,6 +596,8 @@ def set_common_options(args, config_data: dict):
         "ray_args",
         "ray_node_manager_port",
         "ray_object_manager_port",
+        "enable_lmcache",
+        "lmcache_lookup_service_port",
     ]
 
     for option in options:

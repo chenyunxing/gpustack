@@ -508,7 +508,7 @@ def run(args: argparse.Namespace):
         logger.info(f"GPUStack version: {__version__} ({__git_commit__})")
 
         if not cfg.server_url and cfg.enable_lmcache:
-            start_lmcache_lookup_server(cfg)
+            start_lmcache_centralized_server(cfg)
 
         if cfg.server_url:
             run_worker(cfg)
@@ -519,17 +519,17 @@ def run(args: argparse.Namespace):
         logger.fatal(e)
 
 
-def start_lmcache_lookup_server(cfg: Config):
-    from threading import Thread
-    from fakeredis import TcpFakeServer
+def start_lmcache_centralized_server(cfg: Config):
+    import subprocess
 
     host = get_first_non_loopback_ip()
     port = cfg.lmcache_register_port
-    server_address = (host, port)
-    server = TcpFakeServer(server_address, server_type="redis")
-    t = Thread(target=server.serve_forever, daemon=True)
-    t.start()
-    logger.info(f"Started LMCACHE register server at {host}:{port}")
+    subprocess.run(
+        ["lmcache_server", host, str(port)],
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        # env=env,
+    )
 
 
 def run_server(cfg: Config):

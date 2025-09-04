@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 from typing import Dict, List, Optional
-from gpustack.utils import network
 from gpustack.schemas.models import ModelInstance, ModelInstanceStateEnum
 from gpustack.schemas.workers import VendorEnum
 from gpustack.utils.command import (
@@ -19,7 +18,6 @@ from gpustack.utils.hub import (
     get_max_model_len,
     get_pretrained_config,
 )
-from urllib.parse import urlparse
 from gpustack.worker.backends.base import InferenceServer, is_ascend_310p
 
 logger = logging.getLogger(__name__)
@@ -100,30 +98,17 @@ class VLLMServer(InferenceServer):
                 )
             from gpustack.config.config import get_global_config
 
-            logger.info("=====================")
-            logger.info(env)
-            logger.info(self._clientset)
-            logger.info(self._worker)
-            logger.info(self._clientset.workers)
-            # main_server_ip = env.get("SSH_CLIENT", "").split(" ")[0]
-
             config = get_global_config()
             if config.enable_lmcache:
-                # 环境变量配置，比较灵活，但是用户需要修改大量数据时，需要改动多，并且排查BUG也困难
-                distributed_port = network.get_free_port(
-                    port_range=config.lmcache_distributed_port,
-                )
-                env["LMCACHE_CHUNK_SIZE"] = str(config.lmcache_chunk_size)
-                env["LMCACHE_LOCAL_CPU"] = "True"
-                env["LMCACHE_MAX_LOCAL_CPU_SIZE"] = str(config.lmcache_capacity_gib)
-                env["LMCACHE_ENABLE_P2P"] = "true"
-                env["LMCACHE_DISTRIBUTED_URL"] = f"{self._worker.ip}:{distributed_port}"
-                domain = urlparse(config.server_url).netloc
-                if ':' in domain:
-                    host = domain.split(':', 1)[0]
-                else:
-                    host = domain
-                env["LMCACHE_LOOKUP_URL"] = f"{host}:{config.lmcache_register_port}"
+                if not bool(env["LMCACHE_ENABLE_P2P"]):
+                    env["LMCACHE_REMOTE_URL"] = "lm://localhost:65432"
+                    env["LMCACHE_CHUNK_SIZE"] = str(config.lmcache_chunk_size)
+                    env["LMCACHE_LOCAL_CPU"] = "True"
+                    # env["LMCACHE_REMOTE_SERDE"]="naive" # cachegen
+                    env["LMCACHE_REMOTE_URL"] = (
+                        f"lm://{self._clientset.workers.ip}:{config.lmcache_register_port}"
+                    )
+
                 kv_transfer_config = env.get("LMCACHE_KV_TRANSFER_CONFIG")
                 if not kv_transfer_config:
                     arguments.extend(

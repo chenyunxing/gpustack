@@ -100,7 +100,7 @@ class VLLMServer(InferenceServer):
 
             config = get_global_config()
             if config.enable_lmcache:
-                if not bool(env["LMCACHE_ENABLE_P2P"]):
+                if not bool(env.get("LMCACHE_ENABLE_P2P")):
                     env["LMCACHE_REMOTE_URL"] = "lm://localhost:65432"
                     env["LMCACHE_CHUNK_SIZE"] = str(config.lmcache_chunk_size)
                     env["LMCACHE_LOCAL_CPU"] = "True"

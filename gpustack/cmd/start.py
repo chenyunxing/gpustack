@@ -13,7 +13,6 @@ from gpustack import __version__, __git_commit__
 from gpustack.config.config import set_global_config
 from gpustack.logging import setup_logging
 from gpustack.utils.envs import get_gpustack_env, get_gpustack_env_bool
-from gpustack.utils.network import get_first_non_loopback_ip
 from gpustack.worker.worker import Worker
 from gpustack.config import Config
 from gpustack.server.server import Server
@@ -507,7 +506,7 @@ def run(args: argparse.Namespace):
 
         logger.info(f"GPUStack version: {__version__} ({__git_commit__})")
 
-        if not cfg.server_url and cfg.enable_lmcache:
+        if cfg.enable_lmcache:
             start_lmcache_centralized_server(cfg)
 
         if cfg.server_url:
@@ -519,17 +518,28 @@ def run(args: argparse.Namespace):
         logger.fatal(e)
 
 
-def start_lmcache_centralized_server(cfg: Config):
+def start_server(host: str, port: int):
     import subprocess
 
-    host = get_first_non_loopback_ip()
-    port = cfg.lmcache_register_port
     subprocess.run(
         ["lmcache_server", host, str(port)],
         stdout=sys.stdout,
         stderr=sys.stderr,
         # env=env,
     )
+
+
+def start_lmcache_centralized_server(cfg: Config):
+    port = cfg.lmcache_register_port
+    process = multiprocessing.Process(
+        target=start_server,
+        args=(
+            cfg.worker_ip,
+            port,
+        ),
+    )
+    process.daemon = False
+    process.start()
 
 
 def run_server(cfg: Config):

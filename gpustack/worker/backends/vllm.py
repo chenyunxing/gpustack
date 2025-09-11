@@ -101,12 +101,22 @@ class VLLMServer(InferenceServer):
             config = get_global_config()
             if config.enable_lmcache:
                 if not bool(env.get("LMCACHE_ENABLE_P2P")):
-                    env["LMCACHE_REMOTE_URL"] = "lm://localhost:65432"
                     env["LMCACHE_CHUNK_SIZE"] = str(config.lmcache_chunk_size)
-                    env["LMCACHE_LOCAL_CPU"] = "True"
-                    # env["LMCACHE_REMOTE_SERDE"]="naive" # cachegen
+                    env["LMCACHE_LOCAL_CPU"] = (
+                        env.get("LMCACHE_LOCAL_CPU")
+                        if env.get("LMCACHE_LOCAL_CPU")
+                        else "True"
+                    )
+                    env["LMCACHE_REMOTE_SERDE"] = (
+                        env.get("LMCACHE_REMOTE_SERDE")
+                        if env.get("LMCACHE_REMOTE_SERDE")
+                        else "naive"
+                    )
+                    # "cachegen" # naive
                     env["LMCACHE_REMOTE_URL"] = (
-                        f"lm://{self._clientset.workers.ip}:{config.lmcache_register_port}"
+                        env.get("LMCACHE_REMOTE_URL")
+                        if env.get("LMCACHE_REMOTE_URL")
+                        else f"lm://{self._worker.ip}:{config.lmcache_register_port}"
                     )
 
                 kv_transfer_config = env.get("LMCACHE_KV_TRANSFER_CONFIG")
